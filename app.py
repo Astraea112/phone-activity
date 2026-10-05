@@ -30,8 +30,11 @@ def require_token():
     """没设密码就不查；设了就必须带对的 Bearer。"""
     if not EXPECTED_TOKEN:
         return None
+    # 先看 Header，再看网址里的 ?token=
     auth = request.headers.get("Authorization", "")
     token = auth.replace("Bearer ", "").strip()
+    if not token:
+        token = request.args.get("token", "").strip()
     if token != EXPECTED_TOKEN:
         return jsonify({"error": "unauthorized"}), 401
     return None
