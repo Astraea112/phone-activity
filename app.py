@@ -479,18 +479,20 @@ def ping():
 
 # ─── 保活：防止 Render 免费版冻结服务 ───
 
-RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
+RENDER_URL = os.environ.get(
+    "RENDER_EXTERNAL_URL",
+    "https://phone-activity-ptd4.onrender.com"
+)
 
 def keep_alive():
     """每 13 分钟自我 ping，防止 Render 冻结进程。"""
     ctx = ssl.create_default_context()
     while True:
         time.sleep(780)  # 13 分钟
-        if RENDER_URL:
-            try:
-                urllib.request.urlopen(f"{RENDER_URL}/ping", timeout=10, context=ctx)
-            except Exception:
-                pass
+        try:
+            urllib.request.urlopen(f"{RENDER_URL}/ping", timeout=10, context=ctx)
+        except Exception:
+            pass
 
 _keep_alive_thread = threading.Thread(target=keep_alive, daemon=True)
 _keep_alive_thread.start()
