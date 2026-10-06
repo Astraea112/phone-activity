@@ -3,6 +3,10 @@
 
 import os
 import sqlite3
+import threading
+import time
+import urllib.request
+import ssl
 from datetime import datetime, timezone, timedelta
 from contextlib import contextmanager
 from flask import Flask, request, jsonify, Response
@@ -471,6 +475,25 @@ setInterval(load, 60000);  // 每分钟刷新
 @app.route("/ping", methods=["GET"])
 def ping():
     return jsonify({"status": "ok", "version": "2.0"})
+
+
+# ─── 保活：防止 Render 免费版冻结服务 ───
+
+RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "")
+
+def keep_alive():
+    """每 13 分钟自我 ping，防止 Render 冻结进程。"""
+    ctx = ssl.create_default_context()
+    while True:
+        time.sleep(780)  # 13 分钟
+        if RENDER_URL:
+            try:
+                urllib.request.urlopen(f"{RENDER_URL}/ping", timeout=10, context=ctx)
+            except Exception:
+                pass
+
+_keep_alive_thread = threading.Thread(target=keep_alive, daemon=True)
+_keep_alive_thread.start()
 
 
 if __name__ == "__main__":
