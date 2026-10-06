@@ -477,22 +477,6 @@ def ping():
     return jsonify({"status": "ok", "version": "2.1"})
 
 
-@app.route("/debug/token-check", methods=["GET"])
-def debug_token_check():
-    """诊断：检查 token 是否匹配（不暴露实际 token）。"""
-    probe = request.args.get("token", "").strip()
-    expected_len = len(EXPECTED_TOKEN)
-    expected_set = bool(EXPECTED_TOKEN)
-    match = (probe == EXPECTED_TOKEN) if expected_set else None
-    return jsonify({
-        "token_is_set": expected_set,
-        "expected_length": expected_len,
-        "expected_first2": EXPECTED_TOKEN[:2] if expected_set else None,
-        "expected_last2": EXPECTED_TOKEN[-2:] if expected_set else None,
-        "probe_length": len(probe),
-        "match": match,
-    })
-
 
 # ─── 保活：防止 Render 免费版冻结服务 ───
 
