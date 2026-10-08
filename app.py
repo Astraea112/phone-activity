@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""手机活动上报服务 v2：收 iOS 快捷指令的 POST，存 SQLite，提供分析和可视化。"""
+"""手机活动上报服务 v2.2：收 iOS 快捷指令的 POST，存 SQLite，提供分析和可视化。"""
 
 import os
 import sqlite3
@@ -474,7 +474,15 @@ setInterval(load, 60000);  // 每分钟刷新
 
 @app.route("/ping", methods=["GET"])
 def ping():
-    return jsonify({"status": "ok", "version": "2.1"})
+    return jsonify({
+        "status": "ok",
+        "version": "2.2",
+        "keep_alive": {
+            "thread_alive": _keep_alive_thread.is_alive(),
+            "last_ping": _keep_alive_ok.get("last"),
+            "consecutive_fails": _keep_alive_ok.get("fails", 0),
+        },
+    })
 
 
 
@@ -484,18 +492,35 @@ RENDER_URL = os.environ.get(
     "RENDER_EXTERNAL_URL",
     "https://phone-activity-ptd4.onrender.com"
 )
+_keep_alive_ok = {"last": None, "fails": 0}
+
+
+def _do_ping():
+    """发送一次 ping，带独立 SSL 上下文，避免上下文过期。"""
+    try:
+        ctx = ssl.create_default_context()
+        req = urllib.request.Request(f"{RENDER_URL}/ping", method="GET")
+        resp = urllib.request.urlopen(req, timeout=15, context=ctx)
+        resp.read()
+        resp.close()
+        _keep_alive_ok["last"] = datetime.now(CST).strftime("%Y-%m-%d %H:%M:%S")
+        _keep_alive_ok["fails"] = 0
+        return True
+    except Exception:
+        _keep_alive_ok["fails"] += 1
+        return False
+
 
 def keep_alive():
-    """每 13 分钟自我 ping，防止 Render 冻结进程。"""
-    ctx = ssl.create_default_context()
+    """每 8 分钟自我 ping，失败时立即重试一次。"""
     while True:
-        time.sleep(780)  # 13 分钟
-        try:
-            urllib.request.urlopen(f"{RENDER_URL}/ping", timeout=10, context=ctx)
-        except Exception:
-            pass
+        time.sleep(480)  # 8 分钟，留足余量
+        if not _do_ping():
+            time.sleep(10)
+            _do_ping()
 
-_keep_alive_thread = threading.Thread(target=keep_alive, daemon=True)
+
+_keep_alive_thread = threading.Thread(target=keep_alive, daemon=True, name="keep-alive")
 _keep_alive_thread.start()
 
 
